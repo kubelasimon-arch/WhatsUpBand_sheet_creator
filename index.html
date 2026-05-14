@@ -2,278 +2,227 @@
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The What's Up Band - Reliable Editor</title>
+    <title>The What's Up Band - Sheet Creator v2</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&family=Roboto:ital,wght@0,400;0,700;1,400&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Roboto+Mono:wght@700&display=swap');
 
         :root {
             --page-width: 210mm;
+            --page-height: 297mm;
         }
 
-        body { font-family: 'Roboto', sans-serif; background-color: #f0f2f5; margin: 0; }
+        body { 
+            background: #e5e7eb; 
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
 
+        /* Kontejner stránky - fixní A4 */
         .sheet-page {
             width: var(--page-width);
-            min-height: 297mm;
-            padding: 15mm;
-            margin: 20px auto;
+            height: var(--page-height);
+            padding: 12mm 15mm;
+            margin: 0 auto;
             background: white;
-            box-shadow: 0 0 20px rgba(0,0,0,0.2);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
             box-sizing: border-box;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Hlavička dle templatu */
+        .header-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            border-bottom: 3px solid black;
+            padding-bottom: 5px;
+            margin-bottom: 20px;
+        }
+
+        .header-input {
+            border: none;
+            background: transparent;
+            font-weight: bold;
+            outline: none;
+        }
+
+        /* Sekce a Osnova */
+        .staff-container {
+            display: grid;
+            grid-template-columns: 45px 1fr 30px;
+            gap: 10px;
+            align-items: end;
+            margin-bottom: 15mm;
+        }
+
+        .clef-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border-right: 2px solid black;
+            padding-right: 8px;
+        }
+
+        .clef-img {
+            width: 30px;
+            margin-bottom: 2px;
+        }
+
+        .section-label {
+            font-size: 8px;
+            font-weight: 900;
+            text-transform: uppercase;
+            text-align: center;
+            width: 100%;
+        }
+
+        /* Takty a linky */
+        .bars-wrapper {
+            display: flex;
+            border-right: 2px solid black;
             position: relative;
         }
 
-        /* Styl pro linky osnovy */
-        .staff-line {
-            border-top: 1px solid black;
-            width: 100%;
-            height: 2.2mm; /* Přesná mezera mezi linkami */
+        .bar {
+            flex: 1;
+            height: 12mm;
+            border-left: 2px solid black;
+            position: relative;
         }
-        .staff-line:last-child { border-bottom: 1px solid black; }
 
-        /* Akordy */
-        .chord-zone {
+        .chord-row {
+            position: absolute;
+            top: -28px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: space-around;
+        }
+
+        .chord-input {
+            width: 30%;
+            text-align: center;
             font-family: 'Roboto Mono', monospace;
             font-weight: bold;
-            font-size: 13pt;
-            text-align: center;
+            font-size: 14pt;
             border: none;
-            background: transparent;
             outline: none;
-            width: 33%;
+            background: transparent;
         }
-        .chord-zone:hover { background: rgba(0,0,0,0.03); }
 
-        input, textarea { border: none; background: transparent; outline: none; }
+        /* Notové linky - 5 linek */
+        .lines {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .line { border-top: 1px solid #000; width: 100%; }
 
         @media print {
+            body { background: none; padding: 0; }
             .no-print { display: none !important; }
-            .sheet-page { margin: 0; box-shadow: none; border: none; }
-            body { background: white; }
-            input::placeholder { color: transparent; }
+            .sheet-page { margin: 0; box-shadow: none; }
+            .chord-input::placeholder { color: transparent; }
         }
-
-        .hidden { display: none; }
     </style>
 </head>
 <body>
 
-    <div id="home-view" class="max-w-4xl mx-auto py-12 px-6">
-        <h1 class="text-4xl font-black mb-8 uppercase text-center tracking-tighter">The What's Up Band</h1>
-        <div class="flex justify-center mb-10">
-            <button onclick="createNewProject()" class="bg-blue-600 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:bg-blue-700 transition"> + NOVÁ PÍSNIČKA </button>
-        </div>
-        <div id="project-list" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+    <div class="no-print mb-6 flex justify-center gap-4">
+        <button onclick="addSection()" class="bg-blue-600 text-white px-6 py-2 rounded-full font-bold shadow-lg">PŘIDAT SEKCI</button>
+        <button onclick="exportToPDF()" class="bg-black text-white px-6 py-2 rounded-full font-bold shadow-lg">ULOŽIT DO PDF</button>
     </div>
 
-    <div id="editor-view" class="hidden">
-        <div class="no-print sticky top-0 z-50 bg-white/90 backdrop-blur border-b p-4 flex justify-between shadow-sm">
-            <button onclick="showHome()" class="font-bold border px-4 py-2 rounded hover:bg-gray-50">← ZPĚT</button>
-            <div class="space-x-2">
-                <button onclick="saveProject()" class="bg-green-600 text-white px-6 py-2 rounded font-bold hover:bg-green-700">ULOŽIT</button>
-                <button onclick="exportToPDF()" class="bg-black text-white px-6 py-2 rounded font-bold hover:bg-gray-800">EXPORT PDF</button>
+    <div id="capture-area" class="sheet-page">
+        <div class="header-grid">
+            <div class="text-sm">
+                <div class="flex items-center gap-2">Key: <input type="text" class="header-input w-full border-b border-black" placeholder="C"></div>
+                <div class="flex items-center gap-2">BPM: <input type="text" class="header-input w-full border-b border-black" placeholder="120"></div>
+            </div>
+            <div class="text-center">
+                <input type="text" class="header-input text-4xl w-full text-center uppercase tracking-tighter" placeholder="NÁZEV PÍSNĚ">
+                <input type="text" class="header-input text-xl w-full text-center italic" placeholder="Interpret">
+            </div>
+            <div class="text-right text-sm">
+                <div class="flex items-center justify-end gap-2">Version: <input type="text" class="header-input w-8 text-right" value="1"></div>
             </div>
         </div>
 
-        <div id="printable-area" class="sheet-page">
-            <div class="flex justify-between items-start border-b-4 border-black pb-2 mb-8">
-                <div class="w-1/4 text-sm space-y-1">
-                    <div>Key: <input id="field-key" type="text" class="font-bold underline w-12 text-center" placeholder="C"></div>
-                    <div>BPM: <input id="field-bpm" type="text" class="font-bold underline w-16 text-center" placeholder="120"></div>
-                </div>
-                <div class="w-1/2 text-center">
-                    <input id="field-title" type="text" placeholder="NÁZEV PÍSNĚ" class="w-full text-4xl font-black text-center uppercase tracking-tight">
-                    <input id="field-artist" type="text" placeholder="Interpret" class="w-full text-xl text-center italic text-gray-600">
-                </div>
-                <div class="w-1/4 text-right italic text-sm">
-                    Version: <input id="field-version" type="text" class="w-8 font-bold text-right" value="1">
-                </div>
+        <div id="sections-list" class="grid grid-cols-2 gap-x-12 gap-y-10">
             </div>
-
-            <div id="blocks-container" class="grid grid-cols-2 gap-x-10 gap-y-10">
-                </div>
-
-            <button onclick="addBlock()" class="no-print mt-12 w-full border-2 border-dashed border-gray-300 py-6 text-gray-400 font-bold hover:text-blue-500 hover:border-blue-500 transition rounded-lg">
-                + PŘIDAT SEKCI (VERSE / CHORUS)
-            </button>
-        </div>
     </div>
 
     <script>
-        let currentId = null;
-        let projects = JSON.parse(localStorage.getItem('band-projects') || '[]');
-
-        function showHome() {
-            document.getElementById('home-view').classList.remove('hidden');
-            document.getElementById('editor-view').classList.add('hidden');
-            renderProjectList();
-        }
-
-        function createNewProject() {
-            currentId = Date.now();
-            resetFields();
-            addBlock();
-            document.getElementById('home-view').classList.add('hidden');
-            document.getElementById('editor-view').classList.remove('hidden');
-        }
-
-        function resetFields() {
-            document.getElementById('field-title').value = "";
-            document.getElementById('field-artist').value = "";
-            document.getElementById('field-key').value = "";
-            document.getElementById('field-bpm').value = "";
-            document.getElementById('field-version').value = "1";
-            document.getElementById('blocks-container').innerHTML = "";
-        }
-
-        function addBlock(data = null) {
-            const container = document.getElementById('blocks-container');
-            const blockDiv = document.createElement('div');
-            blockDiv.className = 'block-unit relative';
-            blockDiv.setAttribute('data-bars', data ? data.numBars : 4);
-            
-            updateBlockUI(blockDiv, data);
-            container.appendChild(blockDiv);
-        }
-
-        function updateBlockUI(blockDiv, data = null) {
-            const numBars = parseInt(blockDiv.getAttribute('data-bars'));
-            const savedChords = data ? data.chords : {};
-
-            blockDiv.innerHTML = `
-                <div class="bar-controls no-print" style="position: absolute; right: -35px; top: 10mm;">
-                    <button onclick="changeBars(this, 1)" class="bg-white border shadow-sm w-6 h-6 rounded mb-1">+</button>
-                    <button onclick="changeBars(this, -1)" class="bg-white border shadow-sm w-6 h-6 rounded">-</button>
+        function createSectionHTML() {
+            return `
+            <div class="staff-container relative group">
+                <div class="no-print absolute -left-8 top-0 flex flex-col gap-1">
+                    <button onclick="this.closest('.staff-container').remove()" class="text-red-500 font-bold">✕</button>
                 </div>
                 
-                <div class="flex items-start">
-                    <div class="w-12 flex flex-col items-center pr-2 border-r-2 border-black pt-10">
-                        <input type="text" placeholder="VERSE" value="${data ? data.label : ''}" 
-                               class="text-[9px] font-black text-center uppercase w-full">
-                    </div>
+                <div class="clef-area">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/e/e8/G-clef.svg" class="clef-img">
+                    <input type="text" class="section-label border-none outline-none" placeholder="VERSE">
+                </div>
 
-                    <div class="flex-grow flex border-r-2 border-black mt-4" style="min-height: 12mm;">
-                        ${Array.from({ length: numBars }).map((_, i) => `
-                            <div class="flex-grow border-l-2 border-black relative" style="height: 11mm;">
-                                <div class="absolute -top-7 left-0 w-full flex">
-                                    <input type="text" class="chord-zone" data-pos="${i}-0" value="${savedChords[i+'-0'] || ''}" placeholder=".">
-                                    <input type="text" class="chord-zone" data-pos="${i}-1" value="${savedChords[i+'-1'] || ''}">
-                                    <input type="text" class="chord-zone" data-pos="${i}-2" value="${savedChords[i+'-2'] || ''}">
-                                </div>
-                                <div class="staff-line"></div><div class="staff-line"></div>
-                                <div class="staff-line"></div><div class="staff-line"></div>
+                <div class="bars-wrapper">
+                    ${[1,2,3,4].map(i => `
+                        <div class="bar">
+                            <div class="chord-row">
+                                <input type="text" class="chord-input" placeholder="-">
+                                <input type="text" class="chord-input">
                             </div>
-                        `).join('')}
-                    </div>
-                    
-                    <div class="w-6 ml-1 pt-10 font-bold italic text-xs">
-                        x<input type="text" value="${data ? data.rep : '1'}" class="w-4">
-                    </div>
+                            <div class="lines">
+                                <div class="line"></div><div class="line"></div>
+                                <div class="line"></div><div class="line"></div>
+                                <div class="line"></div>
+                            </div>
+                        </div>
+                    `).join('')}
                 </div>
-                <div class="ml-12 mt-1">
-                    <textarea class="w-full text-[11px] italic leading-tight resize-none" 
-                              rows="2" placeholder="Text sekce...">${data ? data.text : ''}</textarea>
+
+                <div class="flex flex-col items-center">
+                    <span class="text-[10px] font-bold">x</span>
+                    <input type="text" class="w-full text-center font-bold text-sm border-none outline-none" value="1">
                 </div>
-            `;
-        }
 
-        function changeBars(btn, delta) {
-            const block = btn.closest('.block-unit');
-            let current = parseInt(block.getAttribute('data-bars'));
-            let next = Math.max(1, Math.min(6, current + delta));
-            
-            // Dočasné uložení dat před překreslením
-            const currentData = {
-                label: block.querySelector('input[placeholder="VERSE"]').value,
-                numBars: next,
-                chords: {},
-                rep: block.querySelector('.w-6 input').value,
-                text: block.querySelector('textarea').value
-            };
-            block.querySelectorAll('.chord-zone').forEach(inp => {
-                if(inp.value) currentData.chords[inp.getAttribute('data-pos')] = inp.value;
-            });
-
-            block.setAttribute('data-bars', next);
-            updateBlockUI(block, currentData);
-        }
-
-        function saveProject() {
-            const blocks = [];
-            document.querySelectorAll('.block-unit').forEach(unit => {
-                const chords = {};
-                unit.querySelectorAll('.chord-zone').forEach(inp => {
-                    if(inp.value) chords[inp.getAttribute('data-pos')] = inp.value;
-                });
-
-                blocks.push({
-                    label: unit.querySelector('input[placeholder="VERSE"]').value,
-                    numBars: parseInt(unit.getAttribute('data-bars')),
-                    chords: chords,
-                    rep: unit.querySelector('.w-6 input').value,
-                    text: unit.querySelector('textarea').value
-                });
-            });
-
-            const project = {
-                id: currentId,
-                title: document.getElementById('field-title').value || "Nová skladba",
-                artist: document.getElementById('field-artist').value,
-                key: document.getElementById('field-key').value,
-                bpm: document.getElementById('field-bpm').value,
-                version: document.getElementById('field-version').value,
-                blocks: blocks
-            };
-
-            const idx = projects.findIndex(p => p.id === currentId);
-            if (idx > -1) projects[idx] = project;
-            else projects.push(project);
-
-            localStorage.setItem('band-projects', JSON.stringify(projects));
-            alert("Projekt uložen!");
-            showHome();
-        }
-
-        function renderProjectList() {
-            const list = document.getElementById('project-list');
-            list.innerHTML = projects.map(p => `
-                <div onclick="loadProject(${p.id})" class="bg-white p-6 rounded-xl border-2 border-transparent hover:border-blue-500 shadow-sm hover:shadow-md cursor-pointer transition">
-                    <h3 class="text-xl font-bold uppercase tracking-tight">${p.title}</h3>
-                    <p class="text-gray-500 italic text-sm">${p.artist || 'Bez interpreta'}</p>
+                <div class="col-start-2 mt-1">
+                    <textarea class="w-full text-[10px] italic border-none outline-none resize-none leading-tight" rows="2" placeholder="Text písně..."></textarea>
                 </div>
-            `).join('');
+            </div>`;
         }
 
-        function loadProject(id) {
-            const p = projects.find(proj => proj.id === id);
-            currentId = p.id;
-            resetFields();
-            document.getElementById('field-title').value = p.title;
-            document.getElementById('field-artist').value = p.artist;
-            document.getElementById('field-key').value = p.key;
-            document.getElementById('field-bpm').value = p.bpm;
-            document.getElementById('field-version').value = p.version;
-            p.blocks.forEach(b => addBlock(b));
-            document.getElementById('home-view').classList.add('hidden');
-            document.getElementById('editor-view').classList.remove('hidden');
+        function addSection() {
+            document.getElementById('sections-list').insertAdjacentHTML('beforeend', createSectionHTML());
         }
 
         function exportToPDF() {
-            const element = document.getElementById('printable-area');
+            const element = document.getElementById('capture-area');
             const opt = {
                 margin: 0,
-                filename: (document.getElementById('field-title').value || 'song') + '.pdf',
+                filename: 'song-sheet.pdf',
                 image: { type: 'jpeg', quality: 1 },
-                html2canvas: { scale: 3, useCORS: true, logging: false },
+                html2canvas: { 
+                    scale: 4, 
+                    useCORS: true,
+                    letterRendering: true 
+                },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
             html2pdf().set(opt).from(element).save();
         }
 
-        renderProjectList();
+        // Přidat první dvě sekce automaticky při načtení
+        addSection();
+        addSection();
     </script>
 </body>
 </html>
