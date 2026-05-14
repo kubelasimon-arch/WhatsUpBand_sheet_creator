@@ -2,105 +2,319 @@
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <title>Band Sheet Editor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The What's Up Band System - Pro Editor</title>
+    <!-- Tailwind CSS pro rychlý a moderní styling (layout, barvy, mezery) -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Knihovna pro převod HTML do PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
-        /* Styl pro "papírový" vzhled A4 */
-        .page-a4 {
-            width: 210mm;
-            min-height: 297mm;
-            padding: 20mm;
-            margin: 10px auto;
-            background: white;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        /* Definice přesných rozměrů a písem */
+        @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&family=Roboto:ital,wght@0,400;0,700;1,400&display=swap');
+
+        :root {
+            --staff-gap: 2.2mm; /* Mezera mezi linkami osnovy */
+            --page-width: 210mm;
+            --page-height: 297mm;
         }
 
-        /* Skrytí okrajů inputů, aby to vypadalo jako čistý papír */
-        input, textarea {
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Simulace A4 papíru na obrazovce */
+        .sheet-page {
+            width: var(--page-width);
+            min-height: var(--page-height);
+            padding: 15mm;
+            margin: 20px auto;
+            background: white;
+            box-shadow: 0 0 20px rgba(0,0,0,0.2);
+            position: relative;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Notová osnova - SVG pro maximální ostrost při tisku */
+        .staff-svg {
+            width: 100%;
+            height: calc(var(--staff-gap) * 4 + 2px);
+            stroke: black;
+            stroke-width: 0.8;
+            fill: none;
+        }
+
+        /* Pole pro akordy - přesně umístěná NAD linkami */
+        .chords-container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            position: absolute;
+            top: -7mm; /* Posun nad osnovu */
+            width: 100%;
+            pointer-events: none; /* Klikatelný bude jen vnitřní input */
+        }
+
+        .chord-input {
+            pointer-events: auto;
+            font-family: 'Roboto Mono', monospace;
+            font-weight: bold;
+            font-size: 14pt;
+            text-align: center;
             border: none;
             background: transparent;
             outline: none;
             width: 100%;
         }
 
-        input:hover, textarea:hover {
-            background: rgba(0,0,0,0.02);
+        /* Styl pro vstupy (aby vypadaly jako psaný text na papíře) */
+        input, textarea {
+            border: none;
+            background: transparent;
+            outline: none;
         }
 
-        /* Notová osnova - 5 linek přesně podle tvého vzoru */
-        .staff-line {
-            border-top: 1px solid #999;
-            height: 8px; /* Mezera mezi linkami */
+        input:focus, textarea:focus {
+            background-color: rgba(0, 123, 255, 0.05);
         }
+
+        /* Skrytí ovládacích prvků při tisku do PDF */
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white; }
+            .sheet-page { margin: 0; box-shadow: none; border: none; }
+        }
+
+        /* Schovávání sekcí aplikace */
+        .hidden { display: none; }
     </style>
 </head>
-<body class="bg-gray-200">
+<body>
 
-    <nav class="bg-black text-white p-4 flex justify-between">
-        <h1 class="font-bold uppercase tracking-widest">Band Sheet Editor</h1>
-        <button onclick="exportPDF()" class="bg-blue-600 px-4 py-1 rounded text-sm hover:bg-blue-500">Export do PDF</button>
-    </nav>
-
-    <div id="editor" class="page-a4 font-serif">
-        
-        <div class="flex justify-between items-start border-b-2 border-black pb-4 mb-8">
-            <div class="text-sm space-y-1">
-                <div>Key: <input type="text" value="C" class="font-bold w-8 underline"></div>
-                <div>BPM: <input type="text" value="103" class="font-bold w-12 underline"></div>
+    <!-- 1. ÚVODNÍ STRÁNKA (SEZNAM PROJEKTŮ) -->
+    <div id="home-view" class="max-w-5xl mx-auto py-12 px-6">
+        <header class="flex justify-between items-center mb-12">
+            <div>
+                <h1 class="text-5xl font-black tracking-tighter uppercase">The What's Up Band</h1>
+                <p class="text-gray-500 font-bold tracking-widest">PROJECT MANAGER</p>
             </div>
-            
-            <div class="text-center flex-grow">
-                <input type="text" value="SONG TITLE" class="text-3xl font-bold text-center uppercase block">
-                <input type="text" value="Artist Name" class="text-xl text-center block">
-            </div>
+            <button onclick="createNewProject()" class="bg-blue-600 text-white px-8 py-4 rounded-full font-bold shadow-lg hover:bg-blue-700 transition">
+                + NOVÁ PÍSNIČKA
+            </button>
+        </header>
 
-            <div class="text-right text-sm italic uppercase">
-                Version: <input type="text" value="1" class="w-6 font-bold">
-            </div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-x-12 gap-y-16">
-            
-            <div class="relative">
-                <div class="flex items-start">
-                    <div class="w-12 pr-2 border-r border-gray-300 italic text-[10px] text-center">
-                        <input type="text" value="⊖" class="text-lg text-center mb-1">
-                        <input type="text" value="VERSE 1" class="font-bold text-center uppercase">
-                    </div>
-
-                    <div class="flex-grow ml-4 relative">
-                        <div class="flex justify-around mb-1 font-mono font-bold text-lg">
-                            <input type="text" value="Am" class="text-center">
-                            <input type="text" value="F" class="text-center">
-                            <input type="text" value="C" class="text-center">
-                        </div>
-                        
-                        <div class="staff-line"></div>
-                        <div class="staff-line"></div>
-                        <div class="staff-line"></div>
-                        <div class="staff-line"></div>
-                        <div class="staff-line" style="border-bottom: 1px solid #999;"></div>
-                    </div>
-
-                    <div class="w-8 ml-2 flex items-center font-bold italic">
-                        x<input type="text" value="4" class="w-full">
-                    </div>
-                </div>
-
-                <div class="ml-12 mt-2">
-                    <textarea rows="3" class="italic text-sm leading-relaxed">I don't like walking around this old and empty house...</textarea>
-                </div>
-            </div>
-
+        <!-- Seznam projektů -->
+        <div id="project-list" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Tady se automaticky objeví uložené projekty -->
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- 2. EDITOR (SAMOTNÁ ŠABLONA) -->
+    <div id="editor-view" class="hidden">
+        <!-- Ovládací lišta v editoru -->
+        <div class="no-print sticky top-0 z-50 bg-white/90 backdrop-blur border-b p-4 flex justify-between items-center shadow-sm">
+            <button onclick="showHome()" class="text-sm font-bold px-4 py-2 border rounded hover:bg-gray-50">← ZPĚT</button>
+            <div class="space-x-3">
+                <button onclick="saveProject()" class="bg-green-600 text-white px-6 py-2 rounded font-bold hover:bg-green-700 transition">ULOŽIT</button>
+                <button onclick="exportToPDF()" class="bg-black text-white px-6 py-2 rounded font-bold hover:bg-gray-800 transition">EXPORT PDF</button>
+            </div>
+        </div>
+
+        <!-- A4 LIST -->
+        <div id="printable-area" class="sheet-page">
+            
+            <!-- HLAVIČKA LISTU (Podle tvého vzoru) -->
+            <div class="flex justify-between items-start border-b-4 border-black pb-4 mb-8">
+                <div class="w-1/4 space-y-2">
+                    <div class="flex items-center text-sm">Key: <input id="field-key" type="text" class="font-bold underline ml-1 w-12 text-center" placeholder="..."></div>
+                    <div class="flex items-center text-sm">BPM: <input id="field-bpm" type="text" class="font-bold underline ml-1 w-16 text-center" placeholder="..."></div>
+                </div>
+                
+                <div class="w-1/2 text-center">
+                    <input id="field-title" type="text" placeholder="NÁZEV PÍSNĚ" class="w-full text-4xl font-black text-center uppercase tracking-tight mb-1">
+                    <input id="field-artist" type="text" placeholder="Interpret / Kapela" class="w-full text-xl text-center italic">
+                </div>
+
+                <div class="w-1/4 text-right">
+                    <span class="text-xs uppercase font-bold">Version:</span>
+                    <input id="field-version" type="text" class="w-8 font-bold text-center border-b border-black" value="1">
+                </div>
+            </div>
+
+            <!-- MŘÍŽKA PRO SEKCE (Dva sloupce) -->
+            <div id="blocks-container" class="grid grid-cols-2 gap-x-12 gap-y-10">
+                <!-- Zde se generují bloky (Intro, Verse, atd.) -->
+            </div>
+
+            <!-- Tlačítko pro přidání bloku (jen v editoru) -->
+            <button onclick="addBlock()" class="no-print mt-12 w-full border-4 border-dashed border-gray-200 py-8 text-gray-400 font-black text-xl hover:border-blue-300 hover:text-blue-400 transition">
+                + PŘIDAT SEKCI (VERSE / CHORUS / SOLO)
+            </button>
+        </div>
+    </div>
+
     <script>
-        function exportPDF() {
-            const element = document.getElementById('editor');
-            html2pdf().from(element).save('band-sheet.pdf');
+        // --- LOGIKA APLIKACE ---
+
+        let currentId = null;
+        // Načtení dat z paměti prohlížeče (LocalStorage)
+        let projects = JSON.parse(localStorage.getItem('band-projects') || '[]');
+
+        function showHome() {
+            document.getElementById('home-view').classList.remove('hidden');
+            document.getElementById('editor-view').classList.add('hidden');
+            renderProjectList();
         }
+
+        function createNewProject() {
+            currentId = Date.now(); // Unikátní ID podle času
+            resetFields();
+            document.getElementById('home-view').classList.add('hidden');
+            document.getElementById('editor-view').classList.remove('hidden');
+            addBlock(); // Začneme s jedním blokem
+        }
+
+        function resetFields() {
+            document.getElementById('field-title').value = "";
+            document.getElementById('field-artist').value = "";
+            document.getElementById('field-key').value = "";
+            document.getElementById('field-bpm').value = "";
+            document.getElementById('field-version').value = "1";
+            document.getElementById('blocks-container').innerHTML = "";
+        }
+
+        // Přidání nového bloku s přesnou osnovou
+        function addBlock(data = null) {
+            const container = document.getElementById('blocks-container');
+            const blockDiv = document.createElement('div');
+            blockDiv.className = 'block-unit relative mb-4';
+            
+            blockDiv.innerHTML = `
+                <div class="flex items-end">
+                    <!-- LEVÝ PANEL (Znak a název) -->
+                    <div class="w-12 flex flex-col items-center pr-2 border-r-2 border-black italic leading-none">
+                        <input type="text" value="${data ? data.icon : '○'}" class="text-2xl text-center w-full mb-1">
+                        <input type="text" placeholder="SEKCE" value="${data ? data.label : ''}" class="text-[10px] font-black text-center uppercase w-full">
+                    </div>
+
+                    <!-- OSNOVA A AKORDY -->
+                    <div class="flex-grow relative ml-3">
+                        <div class="chords-container">
+                            <input type="text" class="chord-input" placeholder="-" value="${data ? data.c1 : ''}">
+                            <input type="text" class="chord-input" value="${data ? data.c2 : ''}">
+                            <input type="text" class="chord-input" value="${data ? data.c3 : ''}">
+                            <input type="text" class="chord-input" value="${data ? data.c4 : ''}">
+                        </div>
+                        <svg class="staff-svg">
+                            <line x1="0" y1="1" x2="100%" y2="1" />
+                            <line x1="0" y1="25%" x2="100%" y2="25%" />
+                            <line x1="0" y1="50%" x2="100%" y2="50%" />
+                            <line x1="0" y1="75%" x2="100%" y2="75%" />
+                            <line x1="0" y1="100%" x2="100%" y2="100%" />
+                            <line x1="25%" y1="0" x2="25%" y2="100%" stroke="#ddd" stroke-width="0.5"/>
+                            <line x1="50%" y1="0" x2="50%" y2="100%" stroke="#ddd" stroke-width="0.5"/>
+                            <line x1="75%" y1="0" x2="75%" y2="100%" stroke="#ddd" stroke-width="0.5"/>
+                        </svg>
+                    </div>
+
+                    <!-- OPAKOVÁNÍ -->
+                    <div class="w-8 ml-2 flex items-center font-bold italic text-sm">
+                        x<input type="text" value="${data ? data.rep : '1'}" class="w-full text-center">
+                    </div>
+                </div>
+                <!-- TEXT POD OSNOVOU -->
+                <div class="ml-16 mt-2">
+                    <textarea class="w-full text-sm italic leading-tight" placeholder="Zde piš text nebo poznámky..." rows="2">${data ? data.text : ''}</textarea>
+                </div>
+            `;
+            container.appendChild(blockDiv);
+        }
+
+        // Uložení do LocalStorage
+        function saveProject() {
+            const blocks = [];
+            document.querySelectorAll('.block-unit').forEach(unit => {
+                const inputs = unit.querySelectorAll('input');
+                blocks.push({
+                    icon: inputs[0].value,
+                    label: inputs[1].value,
+                    c1: inputs[2].value,
+                    c2: inputs[3].value,
+                    c3: inputs[4].value,
+                    c4: inputs[5].value,
+                    rep: inputs[6].value,
+                    text: unit.querySelector('textarea').value
+                });
+            });
+
+            const project = {
+                id: currentId,
+                title: document.getElementById('field-title').value || "Nová skladba",
+                artist: document.getElementById('field-artist').value,
+                key: document.getElementById('field-key').value,
+                bpm: document.getElementById('field-bpm').value,
+                version: document.getElementById('field-version').value,
+                blocks: blocks
+            };
+
+            const idx = projects.findIndex(p => p.id === currentId);
+            if (idx > -1) projects[idx] = project;
+            else projects.push(project);
+
+            localStorage.setItem('band-projects', JSON.stringify(projects));
+            alert("Uloženo v prohlížeči!");
+            showHome();
+        }
+
+        function renderProjectList() {
+            const list = document.getElementById('project-list');
+            list.innerHTML = projects.map(p => `
+                <div onclick="loadProject(${p.id})" class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all group">
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="text-[10px] font-bold bg-gray-100 px-2 py-1 rounded">KEY: ${p.key || '?'}</span>
+                        <span class="text-[10px] font-bold text-gray-400">v.${p.version}</span>
+                    </div>
+                    <h3 class="text-2xl font-black uppercase group-hover:text-blue-600">${p.title}</h3>
+                    <p class="text-gray-500 italic">${p.artist || 'Neznámý interpret'}</p>
+                    <div class="mt-6 pt-4 border-t border-gray-50 text-[10px] font-bold text-gray-300 uppercase tracking-widest">Otevřít projekt →</div>
+                </div>
+            `).join('');
+        }
+
+        function loadProject(id) {
+            const p = projects.find(proj => proj.id === id);
+            currentId = p.id;
+            resetFields();
+            document.getElementById('field-title').value = p.title;
+            document.getElementById('field-artist').value = p.artist;
+            document.getElementById('field-key').value = p.key;
+            document.getElementById('field-bpm').value = p.bpm;
+            document.getElementById('field-version').value = p.version;
+            
+            p.blocks.forEach(b => addBlock(b));
+
+            document.getElementById('home-view').classList.add('hidden');
+            document.getElementById('editor-view').classList.remove('hidden');
+        }
+
+        function exportToPDF() {
+            const element = document.getElementById('printable-area');
+            const title = document.getElementById('field-title').value || 'band_sheet';
+            const opt = {
+                margin: 0,
+                filename: `${title}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            html2pdf().set(opt).from(element).save();
+        }
+
+        // Start
+        renderProjectList();
     </script>
 </body>
 </html>
